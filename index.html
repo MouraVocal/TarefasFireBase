@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <style>
+        .container-login{
+            display: none;
+        }
+        body {
+            background-color:lightgray;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        div.login, div.container-login{
+            flex-direction: row;
+            justify-content: center;
+            margin-top: 10%;
+            height: auto;
+            background-color: lightgreen;
+            padding: 5%;
+            border-radius: 10px;
+            border: black 1px solid;
+        }
+        .header{
+            text-align: center;
+            padding-bottom: 20px;
+        }
+        input, textarea {
+            width: 60%;
+            height: 30px;
+            margin: 10px;
+        }
+        .form-cadastro-tarefa{
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login">
+        <h2 class="header">Faça o login no App</h2>
+
+        <form class="login-form">
+            Login:
+            <input type="email" name="email" id="email"><br/>
+            Senha:
+            <input type="password" name="password" id="password">
+            <input type="submit" name="acao" value="Logar!">
+        </form>
+
+        <h2>Ou então crie seu usuário abaixo:</h2>
+
+        <form class="create-login-form">
+            Seu Novo Login:
+            <input type="email" name="createemail" id="createemail"><br>
+            Sua Nova Senha:
+            <input type="password" name="createpassword" id="createpassword">
+            <input type="submit" name="acao" value="Criar Usuário Novo!">
+        </form>
+        
+    </div>
+
+    <div class="container-login">
+        <h2>Olá, você está logado! <a href="javascript:void(0)" class="logout">Logout</a> </h2>
+        <form class="form-cadastro-tarefa">
+            <textarea name="tarefa"></textarea>
+            <input type="datetime-local" name="datetime">
+            <input type="submit" name="acao" value="Cadastrar Tarefa">
+        </form>
+        <div class="tarefas-usuario">
+            <h3>Listagem de tarefas atuais:</h3>
+            <ul class="listagem"></ul>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.2/firebase-firestore.js"></script>
+
+    <script>
+    var firebaseConfig = {
+        apiKey: "AIzaSyBqfMrVVqbkzZFJLAARBEgmKGqyzA4N-dc",
+        authDomain: "todolist-45667.firebaseapp.com",
+        projectId: "todolist-45667",
+        storageBucket: "todolist-45667.appspot.com",
+        messagingSenderId: "891582248596",
+        appId: "1:891582248596:web:e7e2aee44ef0c101256681",
+        measurementId: "G-E2Q0J44KTT"
+    };
+    firebase.initializeApp(firebaseConfig);
+    firebase.analytics();
+
+    //Começar aqui
+
+        var user = null;
+        var formLogin = document.querySelector('form.login-form');
+        var btnLogout = document.querySelector('.logout');
+        const db = firebase.firestore();
+        var createLoginForm = document.querySelector('form.create-login-form');
+        var formCadastroTarefa = document.querySelector('form.form-cadastro-tarefa');
+
+        createLoginForm.addEventListener('submit', (e)=>{
+            e.preventDefault();
+            var createemail = document.querySelector('[name=createemail]').value;
+            var createpassword = document.querySelector('[name=createpassword]').value;
+
+            firebase.auth().createUserWithEmailAndPassword(createemail, createpassword)
+            .then((userCredential) => {
+            // Signed in 
+            alert('Usuário criado com sucesso')
+            formLogin.reset();
+            createLoginForm.reset();
+            var user = userCredential.user;
+            // ...
+            })
+            .catch((error) => {
+            var errorCode = error.code;
+            var errorMessage = error.message;
+            alert(errorMessage);
+            // ..
+            });
+        });        
+        
+        firebase.auth().onAuthStateChanged((val)=>{
+            if(val){
+                user= val;
+                // alert('Bem-vindo de volta ' + user.email);
+                document.querySelector('.login').style.display = 'none';
+                document.querySelector('.container-login').style.display = 'block';
+                //Ouvindo as mudanças no banco de dados
+                
+                db.collection('tarefas').where('id', '==', user.uid).onSnapshot((data)=>{
+                    let lista = document.querySelector('.listagem');
+                    lista.innerHTML = '';
+                    let tarefas = data.docs;
+                    tarefas = tarefas.sort(function(a, b){
+                        if(a.data().datetime < b.data().datetime){
+                            return -1
+                        }else{
+                            return +1
+                        }
+                    })
+                    tarefas.map((val)=>{
+                        lista.innerHTML += `<li>${val.data().tarefa} <a class='excluir-btn' tarefa-id=${val.id} href='javascript.void(0)'>excluir</a></li> `
+                    })
+                    var excluirTarefa = document.querySelectorAll('.excluir-btn');
+                    excluirTarefa.forEach(element => {
+                        element.addEventListener('click', (e)=>{
+                            e.preventDefault();
+                            let docId = element.getAttribute('tarefa-id');
+                            db.collection('tarefas').doc(docId).delete();
+                        });
+                    });
+                });
+            }
+        });
+
+
+        formLogin.addEventListener('submit', (e)=>{
+            e.preventDefault();
+            let email= document.querySelector('[name=email]').value;
+            let password = document.querySelector('[name=password]').value;
+            // console.log(email);
+            // console.log(password);
+            firebase.auth().signInWithEmailAndPassword(email, password)
+            .then((userCredential) => {
+                // Signed in
+                var user = userCredential.user;
+                document.querySelector('.login').style.display = 'none';
+                document.querySelector('.container-login').style.display = 'block';
+                formLogin.reset();
+                createLoginForm.reset();
+                // alert('Logado com sucesso!'+user.email);
+                // ...
+            })
+            .catch((error) => {
+                var errorCode = error.code;
+                var errorMessage = error.message;
+                alert(errorMessage);
+            });
+            
+        });
+
+        btnLogout.addEventListener('click',(e)=>{
+            e.preventDefault();
+            firebase.auth().signOut().then(() => {
+                alert('Deslogado com sucesso');
+                user = null;
+                document.querySelector('.login').style.display = 'block';
+                document.querySelector('.container-login').style.display = 'none';
+                formCadastroTarefa.reset();
+                // Sign-out successful.
+            }).catch((error) => {
+                alert(error);
+            // An error happened.
+            });
+        });
+
+        var formCadastro = document.querySelector('.form-cadastro-tarefa');
+
+        formCadastro.addEventListener('submit', (e)=>{
+            e.preventDefault();
+            let tarefa = document.querySelector('.form-cadastro-tarefa [name=tarefa]').value;
+            let datetime = document.querySelector('.form-cadastro-tarefa [name=datetime]').value;
+            let dataAtual = new Date().getTime();
+
+            if(tarefa == '' || datetime == ''){
+                alert('Você não pode deixar campos em branco');
+            }else if(dataAtual > new Date(datetime).getTime()){
+                alert('Você informou uma data no passado');
+            }else{
+                db.collection('tarefas').add({
+                    tarefa: tarefa,
+                    datetime: new Date(datetime).getTime(),
+                    id: user.uid
+                })
+                .catch((error) => {
+                    console.error("Error adding document: ", error);
+                });
+                formCadastroTarefa.reset();
+            }
+           
+        });
+
+    </script>
+</body>
+</html>
